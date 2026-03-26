@@ -7,17 +7,16 @@ from playwright.async_api import BrowserContext, Page
 from .manifest import AuthFlow, AuthStep
 
 
-async def run_auth_flow(context: BrowserContext, flow: AuthFlow, base_url: str) -> None:
-    """Execute all steps in *flow* using a temporary page, then close it.
+async def run_auth_flow(context: BrowserContext, flow: AuthFlow, base_url: str) -> Page:
+    """Execute all steps in *flow* and return the authenticated page.
 
-    Cookies and storage are retained in *context* for subsequent pages.
+    The page is kept open so that in-memory auth tokens are preserved
+    for subsequent navigations.
     """
     page = await context.new_page()
-    try:
-        for step in flow.steps:
-            await _execute_step(page, step, base_url)
-    finally:
-        await page.close()
+    for step in flow.steps:
+        await _execute_step(page, step, base_url)
+    return page
 
 
 async def _execute_step(page: Page, step: AuthStep, base_url: str) -> None:
@@ -33,5 +32,7 @@ async def _execute_step(page: Page, step: AuthStep, base_url: str) -> None:
         await page.click(str(params))
     elif action == "wait_for":
         await page.wait_for_selector(str(params))
+    elif action == "wait_for_url":
+        await page.wait_for_url(f"**{params}**", timeout=30000)
     else:
         raise ValueError(f"Unknown auth step action: {action}")

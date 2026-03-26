@@ -71,6 +71,7 @@ class Manifest:
     viewports: dict[str, Viewport]
     auth_flows: dict[str, AuthFlow]
     pages: list[PageConfig]
+    enabled_viewports: list[str] | None = None
 
 
 # ── Env-var resolution ────────────────────────────────────────────────────────
@@ -281,4 +282,5 @@ def _parse_manifest(raw: dict) -> Manifest:
         viewports=viewports,
         auth_flows=auth_flows,
         pages=pages,
+        enabled_viewports=raw.get("enabled_viewports"),
     )

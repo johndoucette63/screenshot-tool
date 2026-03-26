@@ -2,9 +2,11 @@ base_url: "http://localhost:5173"
 output_dir: "./screenshots"
 timestamp_dirs: true
 
+enabled_viewports: [desktop]
+
 defaults:
   wait_until: "networkidle"
-  wait_after: 500
+  wait_after: 1500
   format: "png"
 
 viewports:
@@ -27,9 +29,23 @@ auth_flows:
       - fill: { selector: "input[type='email']", value: "${MEMBER_EMAIL}" }
       - fill: { selector: "input[type='password']", value: "${MEMBER_PASSWORD}" }
       - click: "button[type='submit']"
-      - wait_for: "[data-testid='search']"
+      - wait_for_url: "/member/search"
 
 pages:
+  # ── Login pages (no auth) ──────────────────────────────────────────────
+  - id: admin-login
+    path: "/admin/login"
+    auth: none
+    viewports: [desktop, mobile]
+    full_page: false
+
+  - id: member-login
+    path: "/member/login"
+    auth: none
+    viewports: [desktop, mobile]
+    full_page: false
+
+  # ── Authenticated pages ────────────────────────────────────────────────
   - id: admin-dashboard
     path: "/admin/dashboard"
     auth: admin
@@ -42,17 +58,12 @@ pages:
     viewports: [desktop, mobile, tablet]
     full_page: true
 
-  - id: member-search-filtered
-    path: "/member/search"
-    auth: member
-    viewports: [desktop]
-    before_capture:
-      - click: "button:has-text('Filters')"
-      - wait_after: 300
-    full_page: true
-
   - id: member-profile
-    path: "/member/members/1"
+    path: "/member/search"
     auth: member
     viewports: [desktop, mobile]
     full_page: true
+    before_capture:
+      - wait_for: "button.rounded-lg"
+      - click_and_navigate: "button.rounded-lg >> nth=0"
+      - wait_after: 1500

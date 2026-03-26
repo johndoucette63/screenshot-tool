@@ -27,9 +27,14 @@ async def _execute(page: Page, action: BeforeAction) -> None:
         await page.locator(str(params)).scroll_into_view_if_needed()
     elif name == "wait_for":
         await page.wait_for_selector(str(params))
+    elif name == "wait_for_url":
+        await page.wait_for_url(f"**{params}**", timeout=30000)
     elif name == "wait_after":
         await asyncio.sleep(int(params) / 1000)
     elif name == "select_tab":
         await page.locator(f"text={params}").first.click()
+    elif name == "click_and_navigate":
+        async with page.expect_navigation(wait_until="networkidle"):
+            await page.click(str(params))
     else:
         raise ValueError(f"Unknown before_capture action: {name}")

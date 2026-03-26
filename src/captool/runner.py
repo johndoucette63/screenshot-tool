@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 
-from playwright.async_api import BrowserContext, async_playwright
+from playwright.async_api import BrowserContext, Page, async_playwright
 
 from .actions import run_before_actions
 from .auth import run_auth_flow
@@ -65,13 +65,17 @@ async def run_captures(
     async with async_playwright() as pw:
         browser = await pw.chromium.launch()
         try:
-            # Context cache: (auth_name | None, device_scale_factor) → context
-            contexts: dict[tuple[str | None, float], BrowserContext] = {}
+            # Auth page cache: auth_name → authenticated Page (kept alive
+            # so in-memory tokens survive across navigations).
+            auth_pages: dict[str, Page] = {}
+            contexts: list[BrowserContext] = []
 
             for page_cfg in pages:
                 vp_names = page_cfg.viewports
                 if viewport_filter:
                     vp_names = [v for v in vp_names if v == viewport_filter]
+                elif manifest.enabled_viewports:
+                    vp_names = [v for v in vp_names if v in manifest.enabled_viewports]
 
                 for vp_name in vp_names:
                     vp = manifest.viewports.get(vp_name)
@@ -87,18 +91,19 @@ async def run_captures(
                         continue
 
                     auth_name = page_cfg.auth if page_cfg.auth != "none" else None
-                    ctx_key = (auth_name, vp.device_scale_factor)
 
-                    # Create & authenticate context on first use
-                    if ctx_key not in contexts:
+                    # Authenticate on first use of each auth flow
+                    if auth_name and auth_name not in auth_pages:
                         ctx = await browser.new_context(
                             device_scale_factor=vp.device_scale_factor,
                         )
-                        if auth_name and auth_name in manifest.auth_flows:
+                        contexts.append(ctx)
+                        if auth_name in manifest.auth_flows:
                             try:
-                                await run_auth_flow(
+                                auth_page = await run_auth_flow(
                                     ctx, manifest.auth_flows[auth_name], manifest.base_url
                                 )
+                                auth_pages[auth_name] = auth_page
                             except Exception as exc:
                                 await ctx.close()
                                 report.results.append(
@@ -110,14 +115,26 @@ async def run_captures(
                                     )
                                 )
                                 continue
-                        contexts[ctx_key] = ctx
+
+                    # For unauthenticated pages, create a temporary page
+                    page_to_use = auth_pages.get(auth_name)
+                    temp_page = None
+                    if page_to_use is None:
+                        ctx = await browser.new_context(
+                            device_scale_factor=vp.device_scale_factor,
+                        )
+                        contexts.append(ctx)
+                        temp_page = await ctx.new_page()
+                        page_to_use = temp_page
 
                     result = await _capture_page(
-                        contexts[ctx_key], page_cfg, vp, manifest, output_dir
+                        page_to_use, page_cfg, vp, manifest, output_dir
                     )
+                    if temp_page:
+                        await temp_page.close()
                     report.results.append(result)
 
-            for ctx in contexts.values():
+            for ctx in contexts:
                 await ctx.close()
         finally:
             await browser.close()
@@ -133,13 +150,11 @@ async def run_captures(
 
 
 async def _capture_page(
-    context: BrowserContext,
+    auth_page: Page | None,
     page_cfg: PageConfig,
     viewport: Viewport,
     manifest: Manifest,
     output_dir: Path,
-    *,
-    is_retry: bool = False,
 ) -> CaptureResult:
     wait_until = page_cfg.wait_until or manifest.defaults.wait_until
     wait_after = (
@@ -150,7 +165,8 @@ async def _capture_page(
     filename = f"{page_cfg.id}-{viewport.name}.{fmt}"
     filepath = output_dir / filename
 
-    page = await context.new_page()
+    page = auth_page
+
     try:
         await page.set_viewport_size({"width": viewport.width, "height": viewport.height})
         url = f"{manifest.base_url}{page_cfg.path}"
@@ -159,11 +175,6 @@ async def _capture_page(
         try:
             await page.goto(url, wait_until=wait_until, timeout=30_000)
         except Exception as exc:
-            if not is_retry:
-                await page.close()
-                return await _capture_page(
-                    context, page_cfg, viewport, manifest, output_dir, is_retry=True
-                )
             return await _error_capture(page_cfg, viewport, fmt, output_dir, page, exc)
 
         # Post-load pause
@@ -193,8 +204,6 @@ async def _capture_page(
             success=False,
             error=str(exc),
         )
-    finally:
-        await page.close()
 
 
 async def _error_capture(

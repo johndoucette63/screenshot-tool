@@ -3,7 +3,13 @@
     "allow": [
       "Bash(playwright install:*)",
       "Bash(pip3 install:*)",
-      "Bash(git init:*)"
+      "Bash(git init:*)",
+      "Bash(gtimeout 30 capture run manifests/example.yaml)",
+      "Bash(python3:*)",
+      "Bash(git -C /Users/jd/Code/screenshot-tool status)",
+      "Bash(git -C /Users/jd/Code/screenshot-tool diff)",
+      "Bash(git -C /Users/jd/Code/screenshot-tool log --oneline -5)",
+      "Bash(git -C /Users/jd/Code/screenshot-tool add env.example manifests/example.yaml src/captool/actions.py src/captool/auth.py src/captool/manifest.py src/captool/runner.py docs/data-testid-convention.md .claude/settings.json)"
     ]
   }
 }
