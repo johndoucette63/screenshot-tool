@@ -36,5 +36,9 @@ async def _execute(page: Page, action: BeforeAction) -> None:
     elif name == "click_and_navigate":
         async with page.expect_navigation(wait_until="networkidle"):
             await page.click(str(params))
+    elif name == "select_option":
+        await page.select_option(params["selector"], label=params["value"])
+    elif name == "goto":
+        await page.goto(str(params), wait_until="networkidle")
     else:
         raise ValueError(f"Unknown before_capture action: {name}")
