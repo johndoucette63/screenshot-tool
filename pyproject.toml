@@ -1,0 +1,20 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "captool"
+version = "0.1.0"
+description = "Automated screenshot capture tool for design analysis"
+requires-python = ">=3.12"
+dependencies = [
+    "playwright>=1.40",
+    "click>=8.0",
+    "pyyaml>=6.0",
+    "python-dotenv>=1.0",
+    "pillow>=10.0",
+    "numpy>=1.26",
+]
+
+[project.scripts]
+capture = "captool.cli:cli"

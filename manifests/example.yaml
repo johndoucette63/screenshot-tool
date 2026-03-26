@@ -1,0 +1,58 @@
+base_url: "http://localhost:5173"
+output_dir: "./screenshots"
+timestamp_dirs: true
+
+defaults:
+  wait_until: "networkidle"
+  wait_after: 500
+  format: "png"
+
+viewports:
+  desktop: { width: 1440, height: 900 }
+  mobile: { width: 390, height: 844, device_scale_factor: 2 }
+  tablet: { width: 768, height: 1024 }
+
+auth_flows:
+  admin:
+    steps:
+      - goto: "/admin/login"
+      - fill: { selector: "input[type='email']", value: "${ADMIN_EMAIL}" }
+      - fill: { selector: "input[type='password']", value: "${ADMIN_PASSWORD}" }
+      - click: "button[type='submit']"
+      - wait_for: "nav"
+
+  member:
+    steps:
+      - goto: "/member/login"
+      - fill: { selector: "input[type='email']", value: "${MEMBER_EMAIL}" }
+      - fill: { selector: "input[type='password']", value: "${MEMBER_PASSWORD}" }
+      - click: "button[type='submit']"
+      - wait_for: "[data-testid='search']"
+
+pages:
+  - id: admin-dashboard
+    path: "/admin/dashboard"
+    auth: admin
+    viewports: [desktop]
+    full_page: false
+
+  - id: member-search-default
+    path: "/member/search"
+    auth: member
+    viewports: [desktop, mobile, tablet]
+    full_page: true
+
+  - id: member-search-filtered
+    path: "/member/search"
+    auth: member
+    viewports: [desktop]
+    before_capture:
+      - click: "button:has-text('Filters')"
+      - wait_after: 300
+    full_page: true
+
+  - id: member-profile
+    path: "/member/members/1"
+    auth: member
+    viewports: [desktop, mobile]
+    full_page: true
